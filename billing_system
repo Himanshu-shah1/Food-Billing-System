@@ -1,190 +1,174 @@
 import streamlit as st
 import random
-import time
+import pandas as pd
 from datetime import datetime
 
 # --- Page Configuration ---
-st.set_page_config(page_title="Shah Food Billing System", layout="wide")
+st.set_page_config(page_title="Shah Food Billing", page_icon="🍔", layout="wide")
 
-# --- Custom CSS for Styling and Footer Animation ---
+# --- Advanced CSS for Animations & Professional UI ---
 st.markdown("""
     <style>
-    /* Main background color */
+    /* Main Background */
     .stApp {
-        background-color: #f5f5dc; /* cornsilk2 equivalent */
-    }
-    
-    /* Title styling */
-    .main-title {
-        font-size: 50px;
-        font-weight: bold;
-        text-align: center;
-        color: #fff8dc; /* cornsilk */
-        background-color: black;
-        padding: 20px;
-        border-radius: 10px;
-        border: 5px solid #8b8b7a;
-        margin-bottom: 20px;
+        background: linear-gradient(to right, #fdfcfb, #e2d1c3);
     }
 
-    /* Footer styling */
+    /* Professional Title Styling */
+    .title-container {
+        background-color: #1e1e1e;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    .title-text {
+        color: #ffca28;
+        font-family: 'Trebuchet MS', sans-serif;
+        font-size: 45px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+    }
+
+    /* Animated Footer */
     .footer {
         position: fixed;
         left: 0;
         bottom: 0;
         width: 100%;
-        background-color: black;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
         color: white;
         text-align: center;
-        padding: 10px;
+        padding: 15px;
+        border-top: 3px solid #ffca28;
         z-index: 100;
     }
 
-    /* Animation for the footer text */
-    @keyframes glow {
-        0% { color: #fff; text-shadow: 0 0 5px #fff, 0 0 10px #f5f5dc; }
-        50% { color: #f5f5dc; text-shadow: 0 0 20px #f5f5dc, 0 0 30px #8b8b7a; }
-        100% { color: #fff; text-shadow: 0 0 5px #fff, 0 0 10px #f5f5dc; }
+    @keyframes pulse-glow {
+        0% { text-shadow: 0 0 5px #ffca28; transform: scale(1); }
+        50% { text-shadow: 0 0 20px #ffca28, 0 0 30px #ffa000; transform: scale(1.05); }
+        100% { text-shadow: 0 0 5px #ffca28; transform: scale(1); }
     }
 
-    .animated-footer-text {
-        animation: glow 2s infinite;
-        font-size: 18px;
+    .footer-text {
+        display: inline-block;
+        animation: pulse-glow 3s infinite ease-in-out;
+        font-family: 'Courier New', Courier, monospace;
         font-weight: bold;
-        letter-spacing: 2px;
+        font-size: 1.2rem;
+    }
+
+    /* Styling Metric Cards */
+    [data-testid="stMetricValue"] {
+        font-size: 24px;
+        color: #1b5e20;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- Header ---
-st.markdown('<div class="main-title">Shah Food Billing System</div>', unsafe_allow_html=True)
+# --- Sidebar Management ---
+with st.sidebar:
+    st.image("https://img.icons8.com/fluent/100/000000/restaurant.png")
+    st.header("Settings")
+    tax_rate = st.slider("Tax Rate (%)", 0, 25, 15)
+    service_charge_flat = st.number_input("Service Charge (Rs)", 0.0, 50.0, 1.59)
+    if st.button("🔄 Reset All Fields"):
+        st.cache_data.clear()
+        st.rerun()
 
-# --- State Initialization for Calculator ---
-if 'calc_input' not in st.session_state:
-    st.session_state.calc_input = ""
+# --- App Header ---
+st.markdown('<div class="title-container"><span class="title-text">Shah Food Billing System</span></div>', unsafe_allow_html=True)
 
-# --- Layout ---
-col_menu, col_receipt = st.columns([2, 1])
+# --- Data Structures ---
+drinks_menu = {
+    "Sprite": 20, "Pepsi": 25, "Diet Coke": 30, "Frappe": 50,
+    "Cappuccino": 60, "Fanta": 20, "CocaCola": 30, "Cold Coffee": 50
+}
+food_menu = {
+    "Paneer Tikka": 60, "Veg Burger": 35, "Pasta": 40, "Rice Plate": 50,
+    "Sandwich": 20, "Fries": 40, "Noodles": 50, "Cake": 50
+}
+
+# --- Main Interface ---
+col_menu, col_billing = st.columns([2, 1], gap="large")
 
 with col_menu:
-    st.subheader("Menu")
+    tab1, tab2 = st.tabs(["🥤 Beverage Selection", "🍔 Food Selection"])
     
-    # Sub-columns for Drinks and Food
-    inner_col1, inner_col2 = st.columns(2)
-    
-    with inner_col1:
-        st.markdown("### 🥤 Drinks")
-        drinks = {
-            "Sprite": 20, "Pepsi": 25, "Diet Coke": 30, "Frappe": 50,
-            "Cappuccino": 60, "Fanta": 20, "CocaCola": 30, "Cold Coffee": 50
-        }
-        drink_values = {}
-        for item, price in drinks.items():
-            check = st.checkbox(f"{item} (Rs {price})", key=f"chk_{item}")
-            qty = st.number_input(f"Qty {item}", min_value=0, value=0, step=1, disabled=not check, key=f"val_{item}")
-            drink_values[item] = qty
+    order_items = {}
 
-    with inner_col2:
-        st.markdown("### 🍔 Food")
-        foods = {
-            "Paneer Tikka": 60, "Veg Burger": 35, "Pasta": 40, "Rice Plate": 50,
-            "Sandwich": 20, "Fries": 40, "Noodles": 50, "Cake": 50
-        }
-        food_values = {}
-        for item, price in foods.items():
-            check = st.checkbox(f"{item} (Rs {price})", key=f"chk_{item}")
-            qty = st.number_input(f"Qty {item}", min_value=0, value=0, step=1, disabled=not check, key=f"val_{item}")
-            food_values[item] = qty
+    with tab1:
+        cols = st.columns(2)
+        for i, (item, price) in enumerate(drinks_menu.items()):
+            with cols[i % 2]:
+                qty = st.number_input(f"{item} (Rs {price})", min_value=0, step=1, key=f"drink_{item}")
+                if qty > 0:
+                    order_items[item] = {"qty": qty, "price": price, "total": qty * price}
 
-    st.divider()
-    
-    # --- Calculation Logic ---
-    cost_drinks = sum(drink_values[item] * drinks[item] for item in drinks)
-    cost_food = sum(food_values[item] * foods[item] for item in foods)
-    service_charge = 1.59 if (cost_drinks + cost_food) > 0 else 0.0
-    subtotal = cost_drinks + cost_food + service_charge
-    tax = subtotal * 0.15
-    total_cost = subtotal + tax
+    with tab2:
+        cols = st.columns(2)
+        for i, (item, price) in enumerate(food_menu.items()):
+            with cols[i % 2]:
+                qty = st.number_input(f"{item} (Rs {price})", min_value=0, step=1, key=f"food_{item}")
+                if qty > 0:
+                    order_items[item] = {"qty": qty, "price": price, "total": qty * price}
 
-    st.markdown("### 🧾 Payment Information")
-    pay_col1, pay_col2 = st.columns(2)
-    with pay_col1:
-        st.write(f"**Cost of Drinks:** Rs {cost_drinks:.2f}")
-        st.write(f"**Cost of Food:** Rs {cost_food:.2f}")
-        st.write(f"**Service Charge:** Rs {service_charge:.2f}")
-    with pay_col2:
-        st.write(f"**Paid Tax:** Rs {tax:.2f}")
-        st.write(f"**Sub Total:** Rs {subtotal:.2f}")
-        st.write(f"#### **Total:** Rs {total_cost:.2f}")
+# --- Billing Calculations ---
+subtotal = sum(item['total'] for item in order_items.values())
+applied_tax = subtotal * (tax_rate / 100)
+final_total = subtotal + applied_tax + (service_charge_flat if subtotal > 0 else 0)
 
-with col_receipt:
-    # --- Calculator ---
-    st.subheader("🔢 Calculator")
-    calc_display = st.text_input("Display", value=st.session_state.calc_input, disabled=True, label_visibility="collapsed")
+with col_billing:
+    st.subheader("Order Summary")
     
-    def update_calc(val):
-        st.session_state.calc_input += str(val)
-    
-    def clear_calc():
-        st.session_state.calc_input = ""
+    if order_items:
+        # Display as a clean Table
+        df = pd.DataFrame.from_dict(order_items, orient='index')
+        st.table(df[['qty', 'total']])
         
-    def solve_calc():
-        try:
-            st.session_state.calc_input = str(eval(st.session_state.calc_input))
-        except:
-            st.session_state.calc_input = "Error"
-
-    # Calculator Buttons
-    btn_grid = [
-        ['7', '8', '9', '+'],
-        ['4', '5', '6', '-'],
-        ['1', '2', '3', '*'],
-        ['C', '0', '=', '/']
-    ]
-    
-    for row in btn_grid:
-        cols = st.columns(4)
-        for i, label in enumerate(row):
-            if label == '=':
-                cols[i].button(label, on_click=solve_calc, use_container_width=True)
-            elif label == 'C':
-                cols[i].button(label, on_click=clear_calc, use_container_width=True)
-            else:
-                cols[i].button(label, on_click=update_calc, args=(label,), use_container_width=True)
-
-    st.divider()
-
-    # --- Receipt Area ---
-    st.subheader("📝 Receipt")
-    if st.button("Generate Receipt", use_container_width=True):
-        ref = random.randint(10908, 500876)
-        date_str = datetime.now().strftime("%d/%m/%y %H:%M:%S")
+        st.divider()
+        st.metric("Subtotal", f"Rs {subtotal:.2f}")
+        st.metric("Tax ({tax_rate}%)", f"Rs {applied_tax:.2f}")
+        st.metric("Grand Total", f"Rs {final_total:.2f}", delta=f"{len(order_items)} Items")
         
-        receipt_body = f"""
-        Receipt Ref: Bill{ref}      {date_str}
-        ------------------------------------------
-        Items                      Qty     Price
-        """
-        
-        for item, qty in {**drink_values, **food_values}.items():
-            if qty > 0:
-                price = drinks.get(item, foods.get(item)) * qty
-                receipt_body += f"\n        {item[:15]:<20} {qty:<7} Rs {price:.2f}"
-        
-        receipt_body += f"""
-        ------------------------------------------
-        Cost of Drinks:             Rs {cost_drinks:.2f}
-        Cost of Foods:              Rs {cost_food:.2f}
-        Tax Paid:                   Rs {tax:.2f}
-        Service Charge:             Rs {service_charge:.2f}
-        ------------------------------------------
-        Total Cost:                 Rs {total_cost:.2f}
-        """
-        st.code(receipt_body, language="text")
+        if st.button("🧾 Generate Final Receipt", use_container_width=True, type="primary"):
+            st.balloons()
+            ref = random.randint(100000, 999999)
+            now = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            receipt_content = f"""
+            ================================
+                 SHAH FOOD RESTAURANT
+            ================================
+            Ref: {ref}      Date: {now}
+            --------------------------------
+            """
+            for name, details in order_items.items():
+                receipt_content += f"\n{name:<18} x{details['qty']:>2}   Rs{details['total']:>6.2f}"
+            
+            receipt_content += f"""
+            --------------------------------
+            Subtotal:            Rs {subtotal:>7.2f}
+            Tax ({tax_rate}%):         Rs {applied_tax:>7.2f}
+            Svc Charge:          Rs {service_charge_flat:>7.2f}
+            --------------------------------
+            TOTAL:               Rs {final_total:>7.2f}
+            ================================
+               Thank You! Visit Again
+            ================================
+            """
+            st.code(receipt_content, language="text")
+            st.download_button("📂 Download Bill", receipt_content, file_name=f"Bill_{ref}.txt")
+    else:
+        st.info("Please select items from the menu to start billing.")
 
-# --- Footer with Animation ---
-st.markdown("""
+# --- Professional Animated Footer ---
+st.markdown(f"""
     <div class="footer">
-        <span class="animated-footer-text">Project Created by :- Himanshu Shah</span>
+        <span class="footer-text">🚀 Project Created by :- Himanshu Shah</span>
+        <br>
+        <span style="font-size: 12px; opacity: 0.7;">System Version 2.0 | © {datetime.now().year}</span>
     </div>
     """, unsafe_allow_html=True)
